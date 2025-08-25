@@ -1,8 +1,0 @@
-significantly
-  streamlined by removing:
-  - 🗑️ release_advice.py (400+ lines of overengineering)
-  - 🗑️ decision_api.py (300+ lines of parallel systems)
-  - 🗑️ git_tracker.py (500+ lines redundant with GitSensor)
-
-  The remaining code follows the clean sensors → Ψ → Φ → Ω → actions flow without
-  bypass systems or overengineering.
