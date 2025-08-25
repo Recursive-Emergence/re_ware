@@ -1,0 +1,228 @@
+# RE_ware Sensor Mapping Rules
+# Maps file patterns to ontological structures and relationships
+
+rules:
+  # Python source code modules
+  - match: "**/*.py"
+    exclude: ["**/test_*.py", "**/*_test.py", "**/tests/**", "**/__pycache__/**"]
+    node:
+      type: CODEMODULE
+      fields:
+        language: "python"
+        framework: "{detect}"  # Auto-detect framework from imports
+    edges:
+      - rel: BELONGS_TO
+        from: "{file}"
+        to: "project:root"  # All code belongs to project
+      - rel: IMPLEMENTS
+        from: "{file}"
+        to: "req:{infer}"  # Infer requirements from module name/docstring
+      - rel: DEPENDS_ON
+        from: "{file}"  
+        to: "code:{imports}"  # Link to imported modules
+  
+  # Test files
+  - match: "**/test_*.py"
+    node:
+      type: TEST
+      fields:
+        framework: "pytest"
+        test_type: "unit"
+    edges:
+      - rel: BELONGS_TO
+        from: "{file}"
+        to: "project:root"  # Tests belong to project
+      - rel: VERIFIES
+        from: "{file}"
+        to: "code:{module}"  # test_foo.py -> foo.py
+      - rel: VERIFIES
+        from: "{file}" 
+        to: "req:{infer}"  # Link tests to requirements
+  
+  - match: "**/*_test.py" 
+    node:
+      type: TEST
+      fields:
+        framework: "pytest"
+        test_type: "unit"  
+    edges:
+      - rel: BELONGS_TO
+        from: "{file}"
+        to: "project:root"  # Tests belong to project
+      - rel: VERIFIES
+        from: "{file}"
+        to: "code:{module}"  # foo_test.py -> foo.py
+      - rel: VERIFIES
+        from: "{file}"
+        to: "req:{infer}"  # Link tests to requirements
+  
+  - match: "**/tests/**/*.py"
+    node:
+      type: TEST
+      fields:
+        framework: "pytest"
+        test_type: "{detect}"  # integration, unit, etc.
+    edges:
+      - rel: BELONGS_TO
+        from: "{file}"
+        to: "project:root"  # Tests belong to project
+      - rel: VERIFIES
+        from: "{file}"
+        to: "code:{infer}"
+      - rel: VERIFIES
+        from: "{file}"
+        to: "req:{infer}"  # Link tests to requirements
+  
+  # Requirements (specific match before general docs)
+  - match: "**/requirements/**/*.md"
+    node:
+      type: REQUIREMENT
+      fields:
+        format: "markdown"
+        priority: "medium"
+        source: "requirements_doc"
+    edges:
+      - rel: BELONGS_TO
+        from: "{file}"
+        to: "project:root"
+
+  # Documentation (general)
+  - match: "**/*.md"
+    exclude: ["**/node_modules/**", "**/requirements/**"]
+    node:
+      type: TECHNICALDOC
+      fields:
+        format: "markdown"
+        doc_type: "{detect}"  # readme, spec, guide, etc.
+    edges:
+      - rel: BELONGS_TO
+        from: "{file}"
+        to: "project:root"  # Documentation belongs to project
+      - rel: DOCUMENTS
+        from: "{file}"
+        to: "code:{infer}"  # README.md documents nearby code
+      - rel: DOCUMENTS
+        from: "{file}"
+        to: "spec:{infer}"  # Links to specifications
+  
+  # Configuration files
+  - match: "requirements*.txt"
+    node:
+      type: DEPENDENCY_SPEC
+      fields:
+        package_manager: "pip"
+        scope: "{filename}"  # requirements.txt, requirements-dev.txt
+    edges:
+      - rel: CONFIGURES
+        from: "{file}"
+        to: "project:root"
+  
+  - match: "setup.py"
+    node:
+      type: DEPENDENCY_SPEC
+      fields:
+        package_manager: "setuptools"
+        scope: "distribution"
+    edges:
+      - rel: CONFIGURES
+        from: "{file}"
+        to: "project:root"
+  
+  - match: "pyproject.toml"
+    node:
+      type: DEPENDENCY_SPEC
+      fields:
+        package_manager: "pyproject"
+        scope: "modern"
+    edges:
+      - rel: CONFIGURES
+        from: "{file}"
+        to: "project:root"
+  
+  # CI/CD workflows
+  - match: "**/.github/workflows/*.yml"
+    node:
+      type: WORKFLOW
+      fields:
+        platform: "github_actions"
+        trigger: "{detect}"
+    edges:
+      - rel: TESTS
+        from: "{file}"
+        to: "test:{infer}"
+      - rel: DEPLOYS
+        from: "{file}"
+        to: "project:root"
+  
+  # Docker and containers
+  - match: "**/Dockerfile*"
+    node:
+      type: DEPLOYMENT_SPEC
+      fields:
+        platform: "docker"
+        stage: "{detect}"  # dev, prod, test
+    edges:
+      - rel: DEPLOYS
+        from: "{file}"
+        to: "project:root"
+  
+  - match: "docker-compose*.yml"
+    node:
+      type: DEPLOYMENT_SPEC
+      fields:
+        platform: "docker_compose"
+        environment: "{detect}"
+    edges:
+      - rel: ORCHESTRATES
+        from: "{file}"
+        to: "deploy:{infer}"
+
+# Global settings
+settings:
+  # File size limits (bytes)
+  max_file_size: 1048576  # 1MB
+  
+  # Automatic relationship inference
+  infer_relationships: true
+  infer_test_coverage: true
+  infer_documentation_links: true
+  
+  # Node creation settings  
+  auto_create_project_root: true
+  deduplicate_nodes: true
+  
+  # Edge validation
+  validate_edge_constraints: true
+  allow_self_edges: false
+  max_edges_per_node: 50
+
+# Detection patterns for automatic field inference
+detection:
+  frameworks:
+    python:
+      - pattern: "from flask"
+        framework: "flask"
+      - pattern: "from django"
+        framework: "django"
+      - pattern: "from fastapi"
+        framework: "fastapi"
+      - pattern: "import pytest"
+        framework: "pytest"
+  
+  doc_types:
+    - pattern: "readme"
+      doc_type: "readme"
+    - pattern: "architecture"
+      doc_type: "architecture"
+    - pattern: "spec"
+      doc_type: "specification"
+    - pattern: "api"
+      doc_type: "api_docs"
+  
+  test_types:
+    - pattern: "integration"
+      test_type: "integration"
+    - pattern: "unit" 
+      test_type: "unit"
+    - pattern: "e2e"
+      test_type: "end_to_end"

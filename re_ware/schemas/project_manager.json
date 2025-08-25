@@ -1,0 +1,271 @@
+{
+  "species_id": "project_manager_v1",
+  "version": "1.0.0",
+  "description": "Comprehensive project management schema for modern software engineering - designed to help AI code assistants deliver quality outcomes",
+  
+  "mission": "Navigate and guide AI code assistants (Claude Code, GitHub Copilot, etc.) through complete software project lifecycles with quality gates, best practices, and comprehensive methodology coverage",
+  
+  "supported_node_types": [
+    "PROJECT", "EPIC", "STORY", "SPRINT", "MILESTONE", "BACKLOG",
+    "REQUIREMENT", "SPECIFICATION", "DESIGN", "DECISION", "RISK", "ASSUMPTION", "CONSTRAINT",
+    "COMPONENT", "SERVICE", "API", "INTERFACE", "DATABASE", "SCHEMA", "CONFIGURATION",
+    "CODEMODULE", "CLASS", "FUNCTION", "VARIABLE", "COMMIT", "BRANCH", "PULLREQUEST", "MERGE",
+    "TEST", "TESTSUITE", "BUG", "CODEREVIEW", "TECHNICALDEBT", "COVERAGE", "PERFORMANCE",
+    "BUILD", "PIPELINE", "DEPLOYMENT", "RELEASE", "ENVIRONMENT", "INFRASTRUCTURE", "MONITORING",
+    "TECHNICALDOC", "USERDOC", "APIDOC", "RUNBOOK", "TUTORIAL", "REFERENCE",
+    "ACTOR", "TEAM", "ROLE", "ISSUE", "COMMENT", "DISCUSSION", "MEETING",
+    "METRIC", "KPI", "OKR", "POLICY", "COMPLIANCE", "AUDIT",
+    "ADVICE", "SPEC", "INCIDENT", "ARTIFACT"
+  ],
+  
+  "supported_relation_types": [
+    "implements", "verifies", "derives_from", "supersedes", "depends_on", "addresses", "produces", "rolls_up_to", "owned_by", "observes", "constrains",
+    "reviews", "merges", "commits_to", "branches_from", "fixes", "refactors",
+    "deploys", "monitors", "configures", "scales",
+    "documents", "explains", "references",
+    "tests", "covers", "validates",
+    "assigns", "participates_in", "comments_on", "approves"
+  ],
+  
+  "required_node_fields": {
+    "all": ["id", "type", "title", "state"],
+    
+    "PROJECT": ["content.methodology", "content.phase", "content.stakeholders"],
+    "EPIC": ["content.business_value", "content.acceptance_criteria"],
+    "STORY": ["content.user_story", "content.acceptance_criteria", "content.story_points"],
+    "TASK": ["content.assignee", "content.effort_estimate"],
+    
+    "REQUIREMENT": ["content.priority", "content.type", "content.source"],
+    "ACCEPTANCE_CRITERIA": ["content.criteria_type", "content.testable"],
+    "DEFINITION_OF_DONE": ["content.checklist", "content.applies_to"],
+    
+    "FEATURE": ["content.feature_flag", "content.rollout_strategy"],
+    "BUG": ["content.severity", "content.reproduction_steps", "content.environment"],
+    "TECHNICAL_DEBT": ["content.impact", "content.effort_to_fix"],
+    
+    "CODEMODULE": ["content.language", "content.path", "content.maintainer"],
+    "FUNCTION": ["content.complexity", "content.test_coverage"],
+    "API_ENDPOINT": ["content.method", "content.path", "content.auth_required"],
+    
+    "TEST": ["content.test_type", "content.coverage_target", "content.automation_status"],
+    "BUILD": ["content.build_status", "content.duration", "content.environment"],
+    "DEPLOYMENT": ["content.environment", "content.strategy", "content.health_check"],
+    "RELEASE": ["content.version", "content.release_notes", "content.rollback_plan"],
+    
+    "CODE_REVIEW": ["content.reviewer", "content.review_type", "content.checklist"],
+    "PULL_REQUEST": ["content.target_branch", "content.review_status", "content.ci_status"],
+    
+    "ISSUE": ["content.issue_type", "content.priority", "content.reporter"],
+    "INCIDENT": ["content.severity", "content.impact", "content.response_team"],
+    "ADVICE": ["content.advice_type", "content.actions", "content.generated_at"],
+    
+    "DOCUMENTATION": ["content.doc_type", "content.audience", "content.maintenance_schedule"]
+  },
+  
+  "node_type_constraints": {
+    "PROJECT": {
+      "valid_methodologies": ["agile", "scrum", "kanban", "lean", "waterfall", "hybrid"],
+      "valid_phases": ["inception", "elaboration", "construction", "transition", "maintenance"],
+      "required_stakeholders": ["product_owner", "tech_lead", "team"]
+    },
+    
+    "STORY": {
+      "story_point_range": [1, 2, 3, 5, 8, 13, 21],
+      "user_story_format": "As a [user], I want [goal] so that [benefit]",
+      "max_story_points": 21
+    },
+    
+    "BUG": {
+      "valid_severities": ["critical", "high", "medium", "low"],
+      "valid_priorities": ["P0", "P1", "P2", "P3", "P4"],
+      "required_fields": ["reproduction_steps", "expected_behavior", "actual_behavior"]
+    },
+    
+    "TEST": {
+      "valid_test_types": ["unit", "integration", "e2e", "performance", "security", "accessibility", "visual"],
+      "coverage_thresholds": {"unit": 0.8, "integration": 0.6, "e2e": 0.4},
+      "automation_levels": ["manual", "automated", "semi-automated"]
+    },
+    
+    "CODE_REVIEW": {
+      "review_types": ["security", "performance", "maintainability", "correctness", "style"],
+      "required_checklist": ["code_quality", "test_coverage", "documentation", "security"],
+      "max_review_time_hours": 48
+    },
+    
+    "API_ENDPOINT": {
+      "valid_methods": ["GET", "POST", "PUT", "PATCH", "DELETE"],
+      "required_documentation": ["parameters", "responses", "examples"],
+      "auth_types": ["none", "api_key", "oauth", "jwt", "basic"]
+    }
+  },
+  
+  "relation_constraints": {
+    "implements": {
+      "from_types": ["CODEMODULE", "FUNCTION", "CLASS", "API", "SPECIFICATION", "COMPONENT"],
+      "to_types": ["REQUIREMENT", "STORY", "SPECIFICATION"]
+    },
+    "tests": {
+      "from_types": ["TEST", "TESTSUITE"],
+      "to_types": ["CODEMODULE", "FUNCTION", "API"]
+    },
+    "reviews": {
+      "from_types": ["CODEREVIEW", "ACTOR"],
+      "to_types": ["PULLREQUEST", "CODEMODULE", "DESIGN"]
+    },
+    "fixes": {
+      "from_types": ["PULLREQUEST", "COMMIT"],
+      "to_types": ["BUG", "ISSUE", "TECHNICALDEBT"]
+    },
+    "depends_on": {
+      "from_types": ["CODEMODULE", "FUNCTION", "CLASS", "BUG", "ISSUE", "TECHNICALDEBT"],
+      "to_types": ["CODEMODULE", "FUNCTION", "CLASS", "STORY", "RELEASE"]
+    },
+    "explains": {
+      "from_types": ["TECHNICALDOC", "USERDOC", "APIDOC"],
+      "to_types": ["CODEMODULE", "FUNCTION", "CLASS", "API", "PROJECT", "COMPONENT"]
+    },
+    "verifies": {
+      "from_types": ["TEST", "TESTSUITE", "CODEMODULE"],
+      "to_types": ["CODEMODULE", "FUNCTION", "CLASS", "API", "COMPONENT", "REQUIREMENT", "STORY", "SPECIFICATION"]
+    },
+    "belongs_to": {
+      "from_types": ["CODEMODULE", "TEST", "TESTSUITE", "TECHNICALDOC", "USERDOC", "APIDOC", "DEPENDENCY_SPEC", "CONFIGURATION", "ADVICE"],
+      "to_types": ["PROJECT", "PRODUCT", "COMPONENT", "SERVICE"]
+    },
+    "addresses": {
+      "from_types": ["ADVICE"],
+      "to_types": ["PROJECT", "ISSUE", "BUG", "REQUIREMENT", "STORY", "TECHNICALDEBT"]
+    }
+  },
+  
+  "quality_gates": {
+    "code_quality": {
+      "min_test_coverage": 0.8,
+      "max_code_complexity": 10,
+      "max_function_length": 50,
+      "max_class_length": 300,
+      "documentation_coverage": 0.7
+    },
+    
+    "review_gates": {
+      "min_reviewers": 1,
+      "security_review_required": true,
+      "performance_review_threshold": "high_impact",
+      "architecture_review_required": ["new_service", "breaking_change"]
+    },
+    
+    "release_gates": {
+      "all_tests_passing": true,
+      "no_critical_bugs": true,
+      "documentation_updated": true,
+      "security_scan_passed": true,
+      "performance_benchmarks_met": true
+    },
+    
+    "definition_of_done": {
+      "code_written": true,
+      "tests_written": true,
+      "tests_passing": true,
+      "code_reviewed": true,
+      "documentation_updated": true,
+      "security_reviewed": false,
+      "performance_tested": false
+    }
+  },
+  
+  "llm_integration": {
+    "max_llm_cards": 12,
+    "max_pulse_nodes": 8,
+    "max_pulse_edges": 6,
+    "context_budget_tokens": 16000,
+    "card_compression_ratio": 0.12,
+    
+    "ai_assistant_guidance": {
+      "context_types": ["project_status", "current_task", "quality_gates", "blockers", "next_actions"],
+      "guidance_formats": ["checklist", "step_by_step", "code_examples", "best_practices"],
+      "interaction_modes": ["proactive_suggestions", "on_demand_help", "quality_checks", "progress_tracking"]
+    }
+  },
+  
+  "coverage_thresholds": {
+    "test_coverage": 0.8,
+    "documentation_coverage": 0.7,
+    "code_review_coverage": 0.95,
+    "story_acceptance_criteria": 1.0,
+    "bug_reproduction_steps": 1.0,
+    "api_documentation": 0.9,
+    "security_review_coverage": 0.8
+  },
+  
+  "methodology_support": {
+    "agile_scrum": {
+      "ceremonies": ["daily_standup", "sprint_planning", "sprint_review", "retrospective"],
+      "artifacts": ["product_backlog", "sprint_backlog", "burndown_chart", "velocity_chart"],
+      "roles": ["product_owner", "scrum_master", "developer"],
+      "sprint_length_weeks": [1, 2, 3, 4]
+    },
+    
+    "kanban": {
+      "board_columns": ["backlog", "todo", "in_progress", "review", "done"],
+      "wip_limits": {"in_progress": 3, "review": 2},
+      "cycle_time_tracking": true,
+      "continuous_flow": true
+    },
+    
+    "lean_startup": {
+      "build_measure_learn": true,
+      "mvp_approach": true,
+      "hypothesis_driven": true,
+      "customer_feedback_loops": true
+    },
+    
+    "devops": {
+      "ci_cd_required": true,
+      "infrastructure_as_code": true,
+      "monitoring_and_logging": true,
+      "automated_testing": true,
+      "feature_flags": true
+    }
+  },
+  
+  "ai_assistant_integration": {
+    "supported_assistants": ["claude_code", "github_copilot", "cursor", "codeium", "tabnine"],
+    
+    "guidance_categories": {
+      "project_setup": ["repository_structure", "dependency_management", "ci_cd_setup"],
+      "development": ["coding_standards", "test_strategy", "architecture_patterns"],
+      "quality_assurance": ["review_checklist", "testing_approach", "performance_considerations"],
+      "deployment": ["release_strategy", "rollback_procedures", "monitoring_setup"],
+      "maintenance": ["technical_debt_management", "documentation_updates", "refactoring_opportunities"]
+    },
+    
+    "interaction_patterns": {
+      "context_aware_suggestions": "Provide relevant suggestions based on current project state",
+      "quality_gate_checks": "Automatically verify code meets quality standards",
+      "progress_tracking": "Monitor and report on project milestone progress",
+      "blocker_identification": "Identify and surface potential blockers early",
+      "best_practice_enforcement": "Suggest industry best practices contextually"
+    },
+    
+    "output_formats": {
+      "structured_tasks": "Break complex work into manageable, prioritized tasks",
+      "code_templates": "Provide scaffolding and boilerplate following project patterns",
+      "review_checklists": "Generate context-specific review criteria",
+      "test_scenarios": "Suggest comprehensive test cases and edge cases",
+      "documentation_templates": "Create documentation structure matching project needs"
+    }
+  },
+  
+  "ontology_evolution": {
+    "enable_auto_node_creation": true,
+    "enable_relationship_inference": true,
+    "enable_cleanup_suggestions": true,
+    "tension_detection_sensitivity": "high",
+    "quality_monitoring": true,
+    "progress_tracking": true,
+    "blocker_detection": true,
+    "technical_debt_tracking": true,
+    "performance_monitoring": true
+  }
+}

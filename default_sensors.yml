@@ -1,0 +1,553 @@
+# RE_ware Default Sensor Mapping Rules
+# ===================================
+#
+# This file defines how filesystem patterns map to ontology nodes and relationships.
+# Rules are processed in order - first match wins.
+# Supports glob patterns with ** for recursive matching.
+
+# Project Management & Requirements
+- match: "**/requirements/**/*.md"
+  node:
+    type: REQUIREMENT
+    fields:
+      format: "markdown"
+      priority: "medium"
+      source: "requirements_doc"
+  edges:
+    - relation: BELONGS_TO
+      target: "project:root"
+
+- match: "requirements.txt"
+  node:
+    type: DEPENDENCY_SPEC
+    fields:
+      format: "pip"
+      package_manager: "pip"
+  edges:
+    - relation: CONFIGURES
+      target: "project:root"
+
+- match: "package.json"
+  node:
+    type: DEPENDENCY_SPEC
+    fields:
+      format: "json"
+      package_manager: "npm"
+  edges:
+    - relation: CONFIGURES
+      target: "project:root"
+
+- match: "Cargo.toml"
+  node:
+    type: DEPENDENCY_SPEC
+    fields:
+      format: "toml"
+      package_manager: "cargo"
+  edges:
+    - relation: CONFIGURES
+      target: "project:root"
+
+- match: "go.mod"
+  node:
+    type: DEPENDENCY_SPEC
+    fields:
+      format: "mod"
+      package_manager: "go"
+  edges:
+    - relation: CONFIGURES
+      target: "project:root"
+
+# Python Code Modules
+- match: "**/*.py"
+  exclude: ["**/test_*.py", "**/*_test.py", "**/tests/**", "**/conftest.py"]
+  node:
+    type: CODEMODULE
+    fields:
+      language: "python"
+      format: "source"
+  edges:
+    - relation: BELONGS_TO
+      target: "project:root"
+    - relation: IMPLEMENTS
+      target_pattern: "requirement:*"
+      condition: "auto"
+
+# JavaScript/TypeScript Modules
+- match: "**/*.{js,jsx,ts,tsx}"
+  exclude: ["**/*.test.{js,jsx,ts,tsx}", "**/*.spec.{js,jsx,ts,tsx}", "**/test/**", "**/__tests__/**"]
+  node:
+    type: CODEMODULE
+    fields:
+      language: "javascript"
+      format: "source"
+  edges:
+    - relation: BELONGS_TO
+      target: "project:root"
+    - relation: IMPLEMENTS
+      target_pattern: "requirement:*"
+      condition: "auto"
+
+# Rust Code
+- match: "**/*.rs"
+  exclude: ["**/tests/**", "**/*_test.rs"]
+  node:
+    type: CODEMODULE
+    fields:
+      language: "rust"
+      format: "source"
+  edges:
+    - relation: BELONGS_TO
+      target: "project:root"
+    - relation: IMPLEMENTS
+      target_pattern: "requirement:*"
+      condition: "auto"
+
+# Go Code
+- match: "**/*.go"
+  exclude: ["**/*_test.go", "**/tests/**"]
+  node:
+    type: CODEMODULE
+    fields:
+      language: "go"
+      format: "source"
+  edges:
+    - relation: BELONGS_TO
+      target: "project:root"
+    - relation: IMPLEMENTS
+      target_pattern: "requirement:*"
+      condition: "auto"
+
+# Java Code
+- match: "**/*.java"
+  exclude: ["**/Test*.java", "**/*Test.java", "**/src/test/**"]
+  node:
+    type: CODEMODULE
+    fields:
+      language: "java"
+      format: "source"
+  edges:
+    - relation: BELONGS_TO
+      target: "project:root"
+    - relation: IMPLEMENTS
+      target_pattern: "requirement:*"
+      condition: "auto"
+
+# Python Tests
+- match: "**/test_*.py"
+  node:
+    type: TEST
+    fields:
+      test_framework: "pytest"
+      language: "python"
+  edges:
+    - relation: BELONGS_TO
+      target: "project:root"
+    - relation: VERIFIES
+      target_pattern: "requirement:*"
+      condition: "auto"
+
+- match: "**/*_test.py"
+  node:
+    type: TEST
+    fields:
+      test_framework: "pytest"
+      language: "python"
+  edges:
+    - relation: BELONGS_TO
+      target: "project:root"
+    - relation: VERIFIES
+      target_pattern: "requirement:*"
+      condition: "auto"
+
+- match: "**/tests/**/*.py"
+  node:
+    type: TEST
+    fields:
+      test_framework: "pytest"
+      language: "python"
+  edges:
+    - relation: BELONGS_TO
+      target: "project:root"
+    - relation: VERIFIES
+      target_pattern: "requirement:*"
+      condition: "auto"
+
+# JavaScript/TypeScript Tests
+- match: "**/*.test.{js,jsx,ts,tsx}"
+  node:
+    type: TEST
+    fields:
+      test_framework: "jest"
+      language: "javascript"
+  edges:
+    - relation: BELONGS_TO
+      target: "project:root"
+    - relation: VERIFIES
+      target_pattern: "requirement:*"
+      condition: "auto"
+
+- match: "**/*.spec.{js,jsx,ts,tsx}"
+  node:
+    type: TEST
+    fields:
+      test_framework: "jest"
+      language: "javascript"
+  edges:
+    - relation: BELONGS_TO
+      target: "project:root"
+    - relation: VERIFIES
+      target_pattern: "requirement:*"
+      condition: "auto"
+
+- match: "**/test/**/*.{js,jsx,ts,tsx}"
+  node:
+    type: TEST
+    fields:
+      test_framework: "mocha"
+      language: "javascript"
+  edges:
+    - relation: BELONGS_TO
+      target: "project:root"
+    - relation: VERIFIES
+      target_pattern: "requirement:*"
+      condition: "auto"
+
+- match: "**/__tests__/**/*.{js,jsx,ts,tsx}"
+  node:
+    type: TEST
+    fields:
+      test_framework: "jest"
+      language: "javascript"
+  edges:
+    - relation: BELONGS_TO
+      target: "project:root"
+    - relation: VERIFIES
+      target_pattern: "requirement:*"
+      condition: "auto"
+
+# Rust Tests
+- match: "**/*_test.rs"
+  node:
+    type: TEST
+    fields:
+      test_framework: "cargo"
+      language: "rust"
+  edges:
+    - relation: BELONGS_TO
+      target: "project:root"
+    - relation: VERIFIES
+      target_pattern: "requirement:*"
+      condition: "auto"
+
+- match: "**/tests/**/*.rs"
+  node:
+    type: TEST
+    fields:
+      test_framework: "cargo"
+      language: "rust"
+  edges:
+    - relation: BELONGS_TO
+      target: "project:root"
+    - relation: VERIFIES
+      target_pattern: "requirement:*"
+      condition: "auto"
+
+# Go Tests
+- match: "**/*_test.go"
+  node:
+    type: TEST
+    fields:
+      test_framework: "go_test"
+      language: "go"
+  edges:
+    - relation: BELONGS_TO
+      target: "project:root"
+    - relation: VERIFIES
+      target_pattern: "requirement:*"
+      condition: "auto"
+
+# Java Tests  
+- match: "**/Test*.java"
+  node:
+    type: TEST
+    fields:
+      test_framework: "junit"
+      language: "java"
+  edges:
+    - relation: BELONGS_TO
+      target: "project:root"
+    - relation: VERIFIES
+      target_pattern: "requirement:*"
+      condition: "auto"
+
+- match: "**/*Test.java"
+  node:
+    type: TEST
+    fields:
+      test_framework: "junit"
+      language: "java"
+  edges:
+    - relation: BELONGS_TO
+      target: "project:root"
+    - relation: VERIFIES
+      target_pattern: "requirement:*"
+      condition: "auto"
+
+- match: "**/src/test/**/*.java"
+  node:
+    type: TEST
+    fields:
+      test_framework: "junit"
+      language: "java"
+  edges:
+    - relation: BELONGS_TO
+      target: "project:root"
+    - relation: VERIFIES
+      target_pattern: "requirement:*"
+      condition: "auto"
+
+# Documentation
+- match: "README.md"
+  node:
+    type: USERDOC
+    fields:
+      format: "markdown"
+      doc_type: "overview"
+      priority: "high"
+  edges:
+    - relation: BELONGS_TO
+      target: "project:root"
+    - relation: DOCUMENTS
+      target: "project:root"
+
+- match: "**/docs/**/*.md"
+  node:
+    type: TECHNICALDOC
+    fields:
+      format: "markdown"
+      doc_type: "technical"
+  edges:
+    - relation: BELONGS_TO
+      target: "project:root"
+    - relation: DOCUMENTS
+      target_pattern: "codemodule:*"
+      condition: "auto"
+
+- match: "**/doc/**/*.md"
+  node:
+    type: TECHNICALDOC
+    fields:
+      format: "markdown" 
+      doc_type: "technical"
+  edges:
+    - relation: BELONGS_TO
+      target: "project:root"
+    - relation: DOCUMENTS
+      target_pattern: "codemodule:*"
+      condition: "auto"
+
+# API Documentation
+- match: "**/api/**/*.{md,yaml,yml,json}"
+  node:
+    type: APIDOC
+    fields:
+      format: "openapi"
+      doc_type: "api"
+  edges:
+    - relation: BELONGS_TO
+      target: "project:root"
+    - relation: DOCUMENTS
+      target_pattern: "codemodule:*"
+      condition: "auto"
+
+- match: "**/*.swagger.{yaml,yml,json}"
+  node:
+    type: APIDOC
+    fields:
+      format: "swagger"
+      doc_type: "api"
+  edges:
+    - relation: BELONGS_TO
+      target: "project:root"
+    - relation: DOCUMENTS
+      target_pattern: "codemodule:*"
+      condition: "auto"
+
+# Configuration Files
+- match: "**/*.{yaml,yml}"
+  exclude: ["**/*.swagger.{yaml,yml}"]
+  node:
+    type: CONFIGURATION
+    fields:
+      format: "yaml"
+      config_type: "application"
+  edges:
+    - relation: CONFIGURES
+      target: "project:root"
+
+- match: "**/*.json"
+  exclude: ["package.json", "**/node_modules/**", "**/*.swagger.json"]
+  node:
+    type: CONFIGURATION
+    fields:
+      format: "json"
+      config_type: "application"
+  edges:
+    - relation: CONFIGURES
+      target: "project:root"
+
+- match: "**/*.{ini,cfg,conf}"
+  node:
+    type: CONFIGURATION
+    fields:
+      format: "ini"
+      config_type: "application"
+  edges:
+    - relation: CONFIGURES
+      target: "project:root"
+
+- match: "**/*.toml"
+  exclude: ["Cargo.toml"]
+  node:
+    type: CONFIGURATION
+    fields:
+      format: "toml"
+      config_type: "application"
+  edges:
+    - relation: CONFIGURES
+      target: "project:root"
+
+# Docker & Containerization
+- match: "Dockerfile*"
+  node:
+    type: CONFIGURATION
+    fields:
+      format: "dockerfile"
+      config_type: "container"
+      deployment: "docker"
+  edges:
+    - relation: CONFIGURES
+      target: "project:root"
+
+- match: "docker-compose*.{yml,yaml}"
+  node:
+    type: CONFIGURATION
+    fields:
+      format: "compose"
+      config_type: "orchestration"
+      deployment: "docker"
+  edges:
+    - relation: CONFIGURES
+      target: "project:root"
+
+# CI/CD Configuration
+- match: ".github/workflows/*.{yml,yaml}"
+  node:
+    type: CONFIGURATION
+    fields:
+      format: "workflow"
+      config_type: "ci_cd"
+      platform: "github_actions"
+  edges:
+    - relation: CONFIGURES
+      target: "project:root"
+
+- match: ".gitlab-ci.yml"
+  node:
+    type: CONFIGURATION
+    fields:
+      format: "gitlab_ci"
+      config_type: "ci_cd"
+      platform: "gitlab"
+  edges:
+    - relation: CONFIGURES
+      target: "project:root"
+
+- match: "Jenkinsfile"
+  node:
+    type: CONFIGURATION
+    fields:
+      format: "jenkinsfile"
+      config_type: "ci_cd"
+      platform: "jenkins"
+  edges:
+    - relation: CONFIGURES
+      target: "project:root"
+
+- match: ".travis.yml"
+  node:
+    type: CONFIGURATION
+    fields:
+      format: "travis"
+      config_type: "ci_cd"
+      platform: "travis"
+  edges:
+    - relation: CONFIGURES
+      target: "project:root"
+
+# Infrastructure as Code
+- match: "**/*.tf"
+  node:
+    type: CONFIGURATION
+    fields:
+      format: "terraform"
+      config_type: "infrastructure"
+      deployment: "terraform"
+  edges:
+    - relation: CONFIGURES
+      target: "project:root"
+
+- match: "**/k8s/**/*.{yml,yaml}"
+  node:
+    type: CONFIGURATION
+    fields:
+      format: "kubernetes"
+      config_type: "infrastructure"
+      deployment: "kubernetes"
+  edges:
+    - relation: CONFIGURES
+      target: "project:root"
+
+- match: "**/kubernetes/**/*.{yml,yaml}"
+  node:
+    type: CONFIGURATION
+    fields:
+      format: "kubernetes"
+      config_type: "infrastructure"
+      deployment: "kubernetes"
+  edges:
+    - relation: CONFIGURES
+      target: "project:root"
+
+# Generic fallback for common file types
+- match: "**/*.md"
+  node:
+    type: TECHNICALDOC
+    fields:
+      format: "markdown"
+      doc_type: "generic"
+  edges:
+    - relation: BELONGS_TO
+      target: "project:root"
+
+# Catch-all for remaining files (low priority)
+- match: "**/*"
+  exclude: [
+    "**/node_modules/**",
+    "**/.git/**", 
+    "**/build/**",
+    "**/dist/**",
+    "**/__pycache__/**",
+    "**/*.pyc",
+    "**/target/**",
+    "**/.DS_Store",
+    "**/Thumbs.db"
+  ]
+  node:
+    type: CONFIGURATION
+    fields:
+      format: "unknown"
+      config_type: "generic"
+  edges:
+    - relation: BELONGS_TO
+      target: "project:root"
