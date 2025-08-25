@@ -41,19 +41,19 @@ State on every node: {status, version, last_changed, change_summary, criticality
 ## Reproduction (adaptive, non-numeric)
 Spawn scoped offspring only when: backlog_pressure>baseline ∧ resources_available ∧ Ω permits. Children inherit a subset gene + stricter Ω and must publish traces; TTL-bounded.
 
-## API (evolution CLI)
+## API (RE_ware CLI)
 ```bash
-# Monitor project state in real-time
-python -m re_ware.evolution monitor
+# Show project consciousness state  
+python evolve.py status
 
-# Get structured project insights
-python -m re_ware.evolution frames
+# Get project reasoning and advice
+python evolve.py advice
 
-# Check quality gates
-python -m re_ware.evolution gates
+# Execute single evolution cycle
+python evolve.py tick
 
-# Execute actions
-python -m re_ware.evolution execute
+# Enable autonomous project management  
+python evolve.py auto --interval 5
 ```
 
 ## Success

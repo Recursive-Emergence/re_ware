@@ -1,12 +1,58 @@
-# RE_ware: Recursive Emergence Software Engineering Framework
+# RE_ware: End "Vibe Coding Myopia" with Recursive Emergence
 
-**A principled, sensor-first architecture for intelligent software lifecycle management through externalized memory, structured reasoning, and safe evolution.**
+---
 
-## Mission
+# The Problem: "Vibe Coding" & Efficiency Myopia
 
-Enable agents to recursively improve software projects by implementing the Recursive Emergence (RE) triad—Ψ (externalized memory), Φ (coherence projection), and Ω (safety guardrails)—creating a reusable framework for systematic, methodical problem-solving guided by economic prudence and entropic discipline.
+Modern teams often optimize for **coding speed** and AI-assisted output, not **coherence**. The result:
 
-**Core Philosophy**: Intelligence emerges from the iterative cycle where fresh external memory (Ψ) enables accurate reasoning (Φ) within safety constraints (Ω), reducing contradiction and unlocking new capabilities over time.
+* **Local wins, global drift:** features ship quickly but diverge from the spec; architecture erodes.
+* **Context collapse:** decisions live in chats/PRs, not in a shared model; new contributors fly blind.
+* **Invisible risk:** tests/coverage/CI and security aren't first-class signals; release calls feel subjective.
+* **Tool thrash:** actions happen in many tools without a unified, auditable memory.
+
+**Bottom line:** velocity climbs while **quality, traceability, and predictability** fall. Teams "lose the plot."
+
+---
+
+# RE as the Remedy: A Conscious Project Entity
+
+**Recursive Emergence (RE)** creates a **self-managing project consciousness** that follows well-trained methodologies:
+
+1. **Ψ — Project Memory:** living ontology of Problems/Specs/Reqs/Code/Tests/Builds/Issues/Decisions
+2. **Φ — Self-Assessment:** continuous evaluation of readiness, coverage, and convergence
+3. **Ω — Self-Discipline:** built-in guardrails that prevent bad practices automatically
+
+The project **thinks for itself**: **Sense → Ψ → Φ → Ω → Act → Learn.** 
+
+The AI agent reads compressed state (≤8 cards + pulse) and autonomously executes **idempotent actions** (issues/PRs/CI) that improve project health without human micromanagement.
+
+---
+
+# What Changes in Practice
+
+* **From "ship code fast" → "close gaps to spec":** every Requirement must be verified by a Test; uncovered items become first-class actions.
+* **From "summarize the repo" → "delta-first truth":** only changed nodes + key counters go to the LLM; big context is replaced by **precise pulls**.
+* **From "feel ready" → "prove ready":** releases are advised only when frames are green and **blocking gates pass** (coverage, stability, security, docs).
+* **From "actions everywhere" → "single ledger":** human-facing work lands in Issues/PRs; local ops (fs/graph/CI) stay internal but fully traced.
+
+---
+
+# How We Keep Control (and Keep It Lightweight)
+
+* **Hot RAM + warm snapshot:** tiny working set in memory; fast reload from file; no huge prompts.
+* **Frames (LLM-free):** Delivery/Quality/Architecture/Risk recomputed every tick, then gates evaluate them.
+* **Advice JSON:** the LLM returns a strict, ranked plan; dispatcher executes or downgrades based on Ω.
+* **Idempotency & audit:** every action carries a stable key; sensors confirm external outcomes next tick.
+
+---
+
+## Success Criteria (conscious project achieved)
+
+* **Autonomous quality**: Project self-monitors coverage, tests, security without human oversight
+* **Self-explaining decisions**: "φ₀ true, coverage 86%, zero P0, green 3d" - project knows its own state
+* **Traceability by design**: Every change automatically links specs → code → tests → issues
+* **Onboarding-free**: New contributors read Ψ, not tribal knowledge - **the project explains itself**
 
 ## Architecture Overview
 
@@ -14,7 +60,8 @@ RE_ware implements a **sensor-first architecture** that ensures externalized mem
 
 ```
 🔄 RE Pattern Flow:
-Sensors → SensorHub → Ψ Update → Φ Projection → Ω Gates → ActionHub → External Reality
+Sensors → SensorHub → Ψ Update → Φ Projection → Ω Gates → ActionHub → External Reality →
+Sensors...
 ```
 
 ### The Recursive Emergence Triad
@@ -33,24 +80,20 @@ Sensors → SensorHub → Ψ Update → Φ Projection → Ω Gates → ActionHub
 
 ## Quick Start
 
-```python
-from re_ware import create_project_intelligence, create_ontology_with_gene
+```bash
+# Interactive system with web dashboard
+python evolve.py --web
 
-# Create ontology with project management schema
-graph = create_ontology_with_gene("project_manager")
+# Interactive system with CLI only (default)
+python evolve.py
 
-# Set up project intelligence with LLM integration  
-intelligence = create_project_intelligence(graph)
-
-# Get AI context for current project state
-context = await intelligence.query_project("What are the next actions needed?")
-
-# Generate structured advice frame for decision making
-advice = await intelligence.generate_advice_frame(
-    species_id="project_manager_v1",
-    instance_id="my_project",
-    phi_state={"phi0": False}
-)
+# Inside the interactive CLI:
+re_ware> status         # Show project consciousness state
+re_ware> advice         # Get project reasoning
+re_ware> tick           # Execute single evolution cycle
+re_ware> auto 5         # Enable autonomous mode (5min intervals)
+re_ware> save           # Save current state
+re_ware> quit           # Exit system
 ```
 
 ## Core Architectural Benefits

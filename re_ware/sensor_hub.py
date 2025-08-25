@@ -203,10 +203,12 @@ class SensorHub:
             except Exception as e:
                 print(f"⚠️  Failed to apply event {event.event_id}: {e}")
         
-        # Update hot state in graph
-        if changed_nodes:
+        # Update hot state in graph (skip for bootstrap to avoid marking all files as "changed")
+        if changed_nodes and not is_bootstrap:
             self.graph.hot_state.changed_nodes.update(changed_nodes)
             print(f"   🔥 Updated hot state: {len(changed_nodes)} nodes changed")
+        elif is_bootstrap and changed_nodes:
+            print(f"   🔍 Bootstrap: Created/updated {len(changed_nodes)} nodes (not marked as changed)")
             
             # CRITICAL: Infer relationships after node creation/updates
             if len(changed_nodes) >= 5:  # Only for substantial batches to avoid noise

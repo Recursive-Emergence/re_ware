@@ -249,9 +249,20 @@ class FsSensor(SensorInterface):
     
     def _scan_initial_state(self):
         """Scan current filesystem state to establish baseline"""
-        # Clear known files so that first poll() will generate create events for all existing files
         self.known_files.clear()
-        print(f"🔍 FsSensor: Reset baseline, will discover existing files on next poll")
+        
+        # Immediately scan to establish baseline without generating change events
+        try:
+            for file_path in self.watch_root.rglob("*"):
+                if file_path.is_file() and not self._should_ignore(file_path):
+                    rel_path = str(file_path.relative_to(self.watch_root))
+                    mtime = file_path.stat().st_mtime
+                    self.known_files[rel_path] = mtime
+            
+            print(f"🔍 FsSensor: Established baseline with {len(self.known_files)} known files")
+        except Exception as e:
+            print(f"⚠️ FsSensor baseline scan failed: {e}")
+            self.known_files.clear()
     
     def poll(self) -> List[DomainEvent]:
         """Poll for filesystem changes"""

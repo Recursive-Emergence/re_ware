@@ -8,13 +8,16 @@ Web mode provides interactive Psi graph visualization with real-time updates.
 
 Usage:
     python evolve.py                    # Interactive CLI mode (default)
-    python evolve.py --web              # Launch web dashboard
+    python evolve.py --web              # Launch with web dashboard
     python evolve.py --web --port 8080  # Web dashboard on custom port
-    python evolve.py --tick             # Run single cycle  
-    python evolve.py --tick 5           # Auto-tick every 5 minutes
-    python evolve.py --status           # Show current status
-    python evolve.py --advice           # Get advice without interaction
-    python evolve.py --evolve           # Run original evolution mode
+    
+    Interactive commands:
+    re_ware> status                     # Show consciousness state
+    re_ware> advice                     # Get project reasoning
+    re_ware> tick                       # Execute evolution cycle
+    re_ware> auto 5                     # Enable autonomous mode (5min intervals)
+    re_ware> save                       # Save current state
+    re_ware> quit                       # Exit system
 """
 
 import sys
@@ -69,17 +72,16 @@ class REWareWebServer:
     def setup_routes(self):
         """Setup FastAPI routes and static files"""
         
-        # Web UI routes (only if enabled)
-        if self.enable_web_ui:
-            @self.app.get("/", response_class=HTMLResponse)
-            async def dashboard(request: Request):
-                """Main dashboard page"""
+        # Root route that dynamically serves dashboard or API info
+        @self.app.get("/", response_class=HTMLResponse)
+        async def root_handler(request: Request):
+            """Dynamic root handler - dashboard if web UI enabled, API info otherwise"""
+            if self.enable_web_ui:
                 return HTMLResponse(content=self.get_dashboard_html(), status_code=200)
-        else:
-            @self.app.get("/")
-            async def api_info():
-                """API information endpoint"""
-                return {
+            else:
+                # Return API info as JSON but handle HTML response type
+                from fastapi.responses import JSONResponse
+                return JSONResponse({
                     "name": "RE_ware Core API",
                     "version": "1.0.0",
                     "endpoints": {
@@ -88,8 +90,9 @@ class REWareWebServer:
                         "/api/tick": "Evolution tick",
                         "/api/advice": "Get advice",
                         "/api/actions": "List actions"
-                    }
-                }
+                    },
+                    "note": "Use 'ui' command in CLI to enable web dashboard"
+                })
         
         @self.app.get("/api/status")
         async def get_status():
@@ -343,32 +346,100 @@ class REWareWebServer:
     async def get_status_data(self):
         """Get current system status data"""
         if not self.agent:
-            return {"error": "Agent not initialized"}
+            return {
+                "phi_metrics": {
+                    "phi0": 0.0,
+                    "coherence": 0.0,
+                    "stability": False,
+                    "cycles": 0
+                },
+                "ontology_state": {
+                    "total_nodes": 0,
+                    "total_edges": 0,
+                    "changed_nodes": 0,
+                    "coverage_ratio": 0.0,
+                    "entropy_hint": 0.0
+                },
+                "auto_tick_interval": self.auto_tick_interval,
+                "status": "initializing"
+            }
         
-        phi_signals = self.agent.ontology.phi_signals()
-        return {
-            "phi_metrics": {
-                "phi0": self.agent.state.phi0,
-                "coherence": self.agent.state.phi_coherence,
-                "stability": self.agent.state.stability_check,
-                "cycles": self.agent.state.cycles_completed
-            },
-            "ontology_state": {
-                "total_nodes": len(self.agent.ontology.nodes),
-                "total_edges": len(self.agent.ontology.edges),
-                "changed_nodes": len(self.agent.ontology.hot_state.changed_nodes),
-                "coverage_ratio": phi_signals.get('coverage_ratio', 0.0),
-                "entropy_hint": phi_signals.get('entropy_hint', 0.0)
-            },
-            "auto_tick_interval": self.auto_tick_interval
-        }
+        try:
+            phi_signals = self.agent.ontology.phi_signals()
+            return {
+                "phi_metrics": {
+                    "phi0": self.agent.state.phi0,
+                    "coherence": self.agent.state.phi_coherence,
+                    "stability": self.agent.state.stability_check,
+                    "cycles": self.agent.state.cycles_completed
+                },
+                "ontology_state": {
+                    "total_nodes": len(self.agent.ontology.nodes),
+                    "total_edges": len(self.agent.ontology.edges),
+                    "changed_nodes": len(self.agent.ontology.hot_state.changed_nodes),
+                    "coverage_ratio": phi_signals.get('coverage_ratio', 0.0),
+                    "entropy_hint": phi_signals.get('entropy_hint', 0.0)
+                },
+                "auto_tick_interval": self.auto_tick_interval,
+                "status": "active"
+            }
+        except Exception as e:
+            return {
+                "phi_metrics": {
+                    "phi0": 0.0,
+                    "coherence": 0.0,
+                    "stability": False,
+                    "cycles": 0
+                },
+                "ontology_state": {
+                    "total_nodes": 0,
+                    "total_edges": 0,
+                    "changed_nodes": 0,
+                    "coverage_ratio": 0.0,
+                    "entropy_hint": 0.0
+                },
+                "auto_tick_interval": self.auto_tick_interval,
+                "status": "error",
+                "error": str(e)
+            }
     
     async def get_graph_data(self):
         """Get hierarchical graph data for visualization"""
         if not self.agent:
-            return {"nodes": [], "edges": []}
+            # Return a placeholder while agent is initializing
+            return {
+                "nodes": [{
+                    "id": "initializing",
+                    "label": "🧠 RE_ware Initializing...",
+                    "type": "SYSTEM",
+                    "status": "initializing",
+                    "criticality": "P1",
+                    "version": "1.0",
+                    "changed": True,
+                    "full_title": "RE_ware System Initializing",
+                    "level": "system"
+                }],
+                "edges": []
+            }
         
-        return self._create_hierarchical_graph()
+        try:
+            return self._create_hierarchical_graph()
+        except Exception as e:
+            # Return error state if graph creation fails
+            return {
+                "nodes": [{
+                    "id": "error", 
+                    "label": f"❌ Graph Error: {str(e)[:50]}...",
+                    "type": "ERROR",
+                    "status": "error",
+                    "criticality": "P0",
+                    "version": "1.0",
+                    "changed": True,
+                    "full_title": f"Graph generation error: {e}",
+                    "level": "system"
+                }],
+                "edges": []
+            }
     
     def _create_hierarchical_graph(self):
         """Create hierarchical graph with major components and expandable groups"""
@@ -962,7 +1033,7 @@ class REWareWebServer:
                 
                 if (isProject) {
                     // PROJECT node: central star
-                    nodeConfig.title = `${node.full_title}\\nProject Hub - Click groups to expand`;
+                    nodeConfig.title = `${node.full_title}\\\\nProject Hub - Click groups to expand`;
                     nodeConfig.borderWidth = 6;
                     nodeConfig.font = { color: 'white', size: 18, face: 'arial black' };
                     nodeConfig.size = 40;
@@ -972,7 +1043,7 @@ class REWareWebServer:
                 } else if (isGroup) {
                     // GROUP nodes: expandable containers
                     const groupType = node.type.replace('GROUP_', '');
-                    nodeConfig.title = `${node.full_title}\\nFiles: ${node.child_count}\\nChanged: ${node.changed_count}\\nDouble-click to expand`;
+                    nodeConfig.title = `${node.full_title}\\\\nFiles: ${node.child_count}\\\\nChanged: ${node.changed_count}\\\\nDouble-click to expand`;
                     nodeConfig.borderWidth = node.changed ? 4 : 3;
                     nodeConfig.font = { 
                         color: 'white', 
@@ -983,7 +1054,7 @@ class REWareWebServer:
                     nodeConfig.shape = 'box';
                 } else {
                     // Individual file nodes (when expanded)
-                    nodeConfig.title = `${node.type}: ${node.full_title}\\nStatus: ${node.status}\\nCriticality: ${node.criticality}`;
+                    nodeConfig.title = `${node.type}: ${node.full_title}\\\\nStatus: ${node.status}\\\\nCriticality: ${node.criticality}`;
                     nodeConfig.borderWidth = node.changed ? 4 : 2;
                     nodeConfig.font = { 
                         color: 'white', 
@@ -1121,10 +1192,10 @@ class REWareWebServer:
                     alert('Execute Actions Error: ' + result.error);
                 } else {
                     console.log('Actions executed:', result);
-                    let message = `${result.message}\n✅ Successful: ${result.successful}\n❌ Failed: ${result.failed}`;
+                    let message = `${result.message}\\n✅ Successful: ${result.successful}\\n❌ Failed: ${result.failed}`;
                     
                     if (result.external_refs && result.external_refs.length > 0) {
-                        message += '\n\n🔗 Created:\n' + result.external_refs.join('\n');
+                        message += '\\n\\n🔗 Created:\\n' + result.external_refs.join('\\n');
                     }
                     
                     alert(message);
@@ -1305,7 +1376,13 @@ class REWareWebServer:
         for sensor in sensors:
             self.agent.sensor_hub.register_sensor(sensor)
         
+        # Show current ontology state (from loaded snapshot or fresh)
+        node_count = len(self.agent.ontology.nodes)
+        edge_count = len(self.agent.ontology.edges)
+        phi_signals = self.agent.ontology.phi_signals()
+        
         print(f"🌐 Dashboard available at: http://localhost:{self.port}")
+        print(f"🧠 Current Ψ state: {node_count} nodes, {edge_count} edges, coverage {phi_signals.get('coverage_ratio', 0.0):.2f}")
         print("📊 Features:")
         print("   • Interactive Psi Graph Visualization")
         print("   • Real-time node highlighting (new/changed)")
@@ -1313,29 +1390,87 @@ class REWareWebServer:
         print("   • Live AI advice generation")
         print("   • WebSocket live updates")
         
-        # Start web server with interactive CLI
-        config = uvicorn.Config(self.app, host="0.0.0.0", port=self.port, log_level="error")
+        # Start the server FIRST so graph is immediately available
+        # Start web server with interactive CLI (suppress uvicorn startup messages)
+        config = uvicorn.Config(
+            self.app, 
+            host="0.0.0.0", 
+            port=self.port, 
+            log_level="critical",  # Suppress logs
+            access_log=False       # Suppress access logs
+        )
         server = uvicorn.Server(config)
         
         # Run server and interactive CLI concurrently
         server_task = asyncio.create_task(server.serve())
         cli_task = asyncio.create_task(self.run_interactive_cli())
         
+        # Bootstrap sensors in background after server starts
+        async def background_bootstrap():
+            await asyncio.sleep(1)  # Let server start
+            try:
+                result = self.agent.sensor_hub.bootstrap_from_watermarks()
+                if result.get('events_applied', 0) > 0:
+                    print(f"📡 Sensor bootstrap completed: {result['events_applied']} new changes detected")
+                    # Broadcast update to connected clients
+                    await self.broadcast_update()
+                else:
+                    print("📡 Sensor bootstrap completed: No new changes since last session")
+            except Exception as e:
+                print(f"⚠️ Background sensor bootstrap failed: {e}")
+        
+        bootstrap_task = asyncio.create_task(background_bootstrap())
+        
         try:
-            # Wait for either to complete
+            # Wait for main tasks to complete (ignore bootstrap task completion)
             done, pending = await asyncio.wait(
                 [server_task, cli_task], 
                 return_when=asyncio.FIRST_COMPLETED
             )
             
-            # Cancel remaining tasks
+            # Check if bootstrap task is still running and cancel it
+            if not bootstrap_task.done():
+                bootstrap_task.cancel()
+                try:
+                    await asyncio.wait_for(bootstrap_task, timeout=0.5)
+                except (asyncio.CancelledError, asyncio.TimeoutError):
+                    pass
+            
+            # Graceful shutdown: signal server to stop
+            server.should_exit = True
+            
+            # Cancel remaining tasks gracefully with timeout
             for task in pending:
                 task.cancel()
+                try:
+                    await asyncio.wait_for(task, timeout=2.0)
+                except (asyncio.CancelledError, asyncio.TimeoutError):
+                    pass  # Expected during shutdown
+                except Exception:
+                    pass  # Ignore other shutdown errors
                 
+        except KeyboardInterrupt:
+            # Handle Ctrl+C gracefully
+            print("\n👋 Shutdown requested")
+            server.should_exit = True
+            for task in [server_task, cli_task, bootstrap_task]:
+                if not task.done():
+                    task.cancel()
+                    try:
+                        await asyncio.wait_for(task, timeout=2.0)
+                    except (asyncio.CancelledError, asyncio.TimeoutError, Exception):
+                        pass  # Ignore shutdown errors
         except Exception as e:
             print(f"❌ Server error: {e}")
-            server_task.cancel()
-            cli_task.cancel()
+            server.should_exit = True
+            # Cancel tasks gracefully
+            for task in [server_task, cli_task, bootstrap_task]:
+                if not task.done():
+                    task.cancel()
+                    try:
+                        await asyncio.wait_for(task, timeout=1.0)
+                    except (asyncio.CancelledError, asyncio.TimeoutError, Exception):
+                        pass  # Ignore shutdown errors
         
         return True
     
@@ -1343,56 +1478,70 @@ class REWareWebServer:
         """Run interactive CLI commands"""
         import sys
         
-        while True:
-            try:
-                # Show prompt
-                print("re_ware> ", end="", flush=True)
-                
-                # Read command (using asyncio-friendly approach)
-                command = await asyncio.get_event_loop().run_in_executor(
-                    None, sys.stdin.readline
-                )
-                command = command.strip().lower()
-                
-                if not command:
-                    continue
+        try:
+            while True:
+                try:
+                    # Show prompt
+                    print("re_ware> ", end="", flush=True)
                     
-                # Handle commands
-                if command in ['quit', 'exit', 'q']:
-                    print("👋 Shutting down...")
+                    # Read command (using asyncio-friendly approach)
+                    command = await asyncio.get_event_loop().run_in_executor(
+                        None, sys.stdin.readline
+                    )
+                    command = command.strip().lower()
+                    
+                    if not command:
+                        continue
+                        
+                    # Handle commands
+                    if command in ['quit', 'exit', 'q']:
+                        break
+                    elif command == 'status':
+                        await self.handle_cli_status()
+                    elif command == 'advice':
+                        await self.handle_cli_advice()  
+                    elif command == 'tick':
+                        await self.handle_cli_tick()
+                    elif command.startswith('auto'):
+                        await self.handle_cli_auto(command)
+                    elif command == 'save':
+                        await self.handle_cli_save()
+                    elif command == 'ui':
+                        await self.handle_cli_ui()
+                        # Explicitly continue the loop after ui command
+                        continue
+                    elif command in ['help', '?']:
+                        self.show_cli_help()
+                    else:
+                        print(f"❓ Unknown command: {command}")
+                        print("💡 Type 'help' for available commands")
+                        
+                except (EOFError, KeyboardInterrupt):
                     break
-                elif command == 'status':
-                    await self.handle_cli_status()
-                elif command == 'advice':
-                    await self.handle_cli_advice()  
-                elif command == 'tick':
-                    await self.handle_cli_tick()
-                elif command == 'save':
-                    await self.handle_cli_save()
-                elif command == 'ui':
-                    await self.handle_cli_ui()
-                elif command in ['help', '?']:
-                    self.show_cli_help()
-                else:
-                    print(f"❓ Unknown command: {command}")
-                    print("💡 Type 'help' for available commands")
+                except asyncio.CancelledError:
+                    # Handle graceful cancellation during shutdown
+                    break
+                except Exception as e:
+                    print(f"❌ CLI error: {e}")
                     
-            except (EOFError, KeyboardInterrupt):
-                print("\n👋 Shutting down...")
-                break
-            except Exception as e:
-                print(f"❌ CLI error: {e}")
+        except asyncio.CancelledError:
+            # Handle task cancellation during shutdown
+            pass
+        except Exception:
+            # Ignore other errors during shutdown
+            pass
     
     def show_cli_help(self):
         """Show CLI help"""
         print("🎯 Available commands:")
-        print("   status  - Show system status")
-        print("   advice  - Get project advice") 
-        print("   tick    - Run evolution tick")
-        print("   save    - Save current state")
-        print("   ui      - Enable web UI and open browser")
-        print("   help    - Show this help")
-        print("   quit    - Shutdown system")
+        print("   status      - Show project consciousness state")
+        print("   advice      - Get project reasoning and recommendations") 
+        print("   tick        - Execute single evolution cycle")
+        print("   auto [min]  - Enable autonomous mode (e.g. 'auto 5' for 5min intervals)")
+        print("   save        - Save current Ψ state to snapshot")
+        print("   ui          - Enable web UI dashboard and open browser")
+        print("   help        - Show this help")
+        print("   quit        - Shutdown system gracefully")
     
     async def handle_cli_status(self):
         """Handle status command"""
@@ -1418,6 +1567,56 @@ class REWareWebServer:
         except Exception as e:
             print(f"❌ Tick error: {e}")
     
+    async def handle_cli_auto(self, command):
+        """Handle autonomous mode command"""
+        try:
+            # Parse interval from command (e.g. "auto 5")
+            parts = command.split()
+            if len(parts) == 1:
+                # Default to 5 minute intervals
+                interval = 5
+            else:
+                try:
+                    interval = int(parts[1])
+                    if interval <= 0:
+                        print("❌ Interval must be positive")
+                        return
+                except ValueError:
+                    print("❌ Invalid interval. Use 'auto <minutes>' (e.g. 'auto 5')")
+                    return
+            
+            print(f"🤖 Starting autonomous mode (interval: {interval}m)")
+            print("   • Project will manage itself autonomously")
+            print("   • Press Ctrl+C to stop autonomous mode")
+            print("")
+            
+            await self.run_autonomous_mode(interval)
+            
+        except Exception as e:
+            print(f"❌ Autonomous mode error: {e}")
+    
+    async def run_autonomous_mode(self, interval_minutes):
+        """Run project in autonomous mode"""
+        cycle_count = 0
+        
+        try:
+            while True:
+                cycle_count += 1
+                print(f"🔄 Autonomous cycle {cycle_count}")
+                
+                # Execute evolution cycle
+                await self.agent._cmd_tick()
+                
+                # Wait for next cycle
+                print(f"⏸️  Waiting {interval_minutes} minutes until next cycle...")
+                await asyncio.sleep(interval_minutes * 60)
+                
+        except KeyboardInterrupt:
+            print(f"\n🛑 Autonomous mode stopped after {cycle_count} cycles")
+            print("🧠 Project returned to interactive mode")
+        except Exception as e:
+            print(f"❌ Autonomous mode error: {e}")
+
     async def handle_cli_save(self):
         """Handle save command"""
         try:
@@ -1436,20 +1635,26 @@ class REWareWebServer:
                 print("🌐 Enabling Web UI...")
                 self.enable_web_ui = True
                 
-                # Update route to serve dashboard
-                @self.app.get("/", response_class=HTMLResponse)
-                async def dashboard(request):
-                    return HTMLResponse(content=self.get_dashboard_html(), status_code=200)
-                
                 print(f"📊 Web Dashboard enabled: http://localhost:{self.port}/")
+                print("💡 Refresh your browser to see the dashboard")
                 
-                # Try to open browser
+            # Try to open browser (run in background to avoid blocking CLI)
+            async def open_browser():
                 try:
                     import webbrowser
-                    webbrowser.open(f"http://localhost:{self.port}/")
+                    # Run in executor to avoid blocking the CLI
+                    await asyncio.get_event_loop().run_in_executor(
+                        None, webbrowser.open, f"http://localhost:{self.port}/"
+                    )
                     print("🔗 Browser opened automatically")
                 except Exception as e:
                     print(f"💡 Please open browser manually: http://localhost:{self.port}/")
+            
+            # Start browser opening in background, don't wait for it
+            asyncio.create_task(open_browser())
+            
+            # Ensure CLI remains responsive
+            print("🎯 CLI remains active for commands")
                     
         except Exception as e:
             print(f"❌ UI enable error: {e}")
@@ -1457,21 +1662,14 @@ class REWareWebServer:
 
 async def main():
     """Main CLI entry point"""
-    parser = argparse.ArgumentParser(description="RE_ware System with Interactive CLI")
+    parser = argparse.ArgumentParser(description="RE_ware System - Conscious Project Entity")
     
-    # Optional web UI
-    parser.add_argument("--web", action="store_true",
-                       help="Enable web UI dashboard")
-    parser.add_argument("--port", type=int, default=8000,
-                       help="Port for server (default: 8000)")
-    
-    # Configuration
-    parser.add_argument("--schema", "-s", type=str, default="project_manager",
-                       help="Gene schema to use (defaults to project_manager)")
-    parser.add_argument("--project-root", type=str, default=".",
-                       help="Project root directory (defaults to current)")
-    parser.add_argument("--list-schemas", action="store_true",
-                       help="List available gene schemas and exit")
+    # Simple arguments for interactive system
+    parser.add_argument("--web", action="store_true", help="Enable web UI dashboard")
+    parser.add_argument("--port", type=int, default=8000, help="Port for server (default: 8000)")
+    parser.add_argument("--schema", "-s", type=str, default="project_manager", help="Gene schema to use")
+    parser.add_argument("--project-root", type=str, default=".", help="Project root directory")
+    parser.add_argument("--list-schemas", action="store_true", help="List available gene schemas and exit")
     
     args = parser.parse_args()
     
@@ -1481,8 +1679,9 @@ async def main():
         print("🧬 Available Gene Schemas:")
         for schema in schemas:
             print(f"   • {schema}")
-        return
+        return 0
     
+    # Always run the interactive system
     project_root = Path(args.project_root).resolve()
     
     try:
@@ -1490,7 +1689,7 @@ async def main():
         if not WEB_DEPENDENCIES_AVAILABLE:
             print("❌ Web dependencies not installed. Install with:")
             print("   pip install fastapi uvicorn jinja2")
-            sys.exit(1)
+            return 1
         
         # Create and run server with interactive CLI
         server = REWareWebServer(project_root, args.schema, args.port, enable_web_ui=args.web)
@@ -1501,9 +1700,9 @@ async def main():
         else:
             print(f"🚀 Starting RE_ware System on port {args.port}")
             print(f"📡 API available at: http://localhost:{args.port}/api/")
-            print("💡 Add --web flag to enable web dashboard")
+            print("💡 Use 'python evolve.py --web' to enable web dashboard")
         
-        print(f"🎯 Interactive commands: status, advice, tick, save, quit")
+        print(f"🎯 Interactive commands: status, advice, tick, auto, save, quit")
         print(f"📋 API endpoints available at /api/")
         print("")
         
@@ -1512,12 +1711,23 @@ async def main():
     
     except KeyboardInterrupt:
         print("\n👋 Shutdown requested")
+        return 0
     
     except Exception as e:
         print(f"❌ Unexpected error: {e}")
-        sys.exit(1)
+        return 1
+    
+    return 0
 
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        exit_code = asyncio.run(main())
+        sys.exit(exit_code)
+    except KeyboardInterrupt:
+        print("\n👋 Interrupted")
+        sys.exit(0)
+    except Exception as e:
+        print(f"❌ Fatal error: {e}")
+        sys.exit(1)

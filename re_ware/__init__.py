@@ -9,13 +9,13 @@ A reusable library for managing complete software project lifecycles through:
 - Autonomous project monitoring
 
 Usage:
-    # Use the evolution CLI interface instead:
-    # python -m re_ware.evolution monitor
-    # python -m re_ware.evolution frames
-    # python -m re_ware.evolution gates
+    # Use the main CLI interface:
+    # python evolve.py status
+    # python evolve.py advice  
+    # python evolve.py tick
 """
 
-# ProjectAgent deprecated - use evolution CLI interface
+# Core RE_ware library exports
 from .ontology import (
     OntologyGraph, NodeType, RelationType, Status, Criticality,
     GraphNode, GraphEdge, LLMCard, create_node, create_edge
