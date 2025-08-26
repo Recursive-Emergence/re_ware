@@ -104,6 +104,12 @@ class SensorHub:
         """
         print("🔄 Bootstrapping sensory system from watermarks...")
         
+        # First, clean up any existing mess
+        print("   🧹 Pre-bootstrap cleanup of irrelevant nodes...")
+        cleanup_stats = self.nuclear_cleanup()
+        if cleanup_stats["removed"] > 0:
+            print(f"   ☢️  Cleaned up {cleanup_stats['removed']} irrelevant nodes before bootstrap")
+        
         # Load watermarks from Ψ snapshot
         self._load_watermarks_from_snapshot()
         
@@ -124,6 +130,21 @@ class SensorHub:
         if initial_events:
             print(f"   📥 Ingesting {len(initial_events)} bootstrap events")
             result = self._apply_batch(initial_events, is_bootstrap=True)
+            
+            # Aggressive post-bootstrap cleanup
+            print("   🔧 Post-bootstrap consolidation...")
+            consolidate_stats = self.consolidate_duplicate_nodes()
+            if consolidate_stats["merged"] > 0:
+                print(f"   🔧 Post-bootstrap consolidated {consolidate_stats['merged']} files, removed {consolidate_stats['removed']} duplicates")
+            
+            print("   🧹 Post-bootstrap aggressive pruning...")
+            prune_stats = self.prune_irrelevant_nodes()
+            if prune_stats["pruned"] > 0:
+                print(f"   🗂️  Post-bootstrap pruned {prune_stats['pruned']} more irrelevant nodes")
+            
+            # Now save watermarks and trigger snapshot after cleanup
+            self._save_watermarks_to_snapshot()
+            
             return {
                 "events_applied": len(initial_events),
                 "nodes_changed": result.get("nodes_changed", []),
@@ -216,8 +237,9 @@ class SensorHub:
                 if relationships_added > 0:
                     print(f"   🔗 Inferred {relationships_added} relationships from node patterns")
         
-        # Save updated watermarks
-        self._save_watermarks_to_snapshot()
+        # Save updated watermarks (but don't trigger snapshot save during bootstrap)
+        if not is_bootstrap:
+            self._save_watermarks_to_snapshot()
         
         return {
             "events_applied": len(events),
@@ -418,6 +440,7 @@ class SensorHub:
     
     def consolidate_duplicate_nodes(self) -> Dict[str, int]:
         """Consolidate duplicate nodes for the same file paths"""
+        print(f"🔧 DEBUG: Starting consolidation with {len(self.graph.nodes)} nodes")
         path_to_nodes = {}
         consolidation_stats = {"merged": 0, "removed": 0}
         
@@ -455,13 +478,252 @@ class SensorHub:
                         del self.graph.node_edges[dup_id]
                     if dup_id in self.graph.hot_state.changed_nodes:
                         self.graph.hot_state.changed_nodes.remove(dup_id)
+                    # Clean up corresponding llm_card
+                    if dup_id in self.graph.llm_cards:
+                        del self.graph.llm_cards[dup_id]
                     
                     consolidation_stats["removed"] += 1
                 
                 consolidation_stats["merged"] += 1
                 print(f"   📝 Consolidated {len(node_list)} nodes for {path}")
         
+        print(f"🔧 DEBUG: After consolidation: {len(self.graph.nodes)} nodes remaining")
+        
+        # Clean up orphaned llm_cards
+        self._cleanup_orphaned_llm_cards()
+        
         return consolidation_stats
+    
+    def prune_irrelevant_nodes(self) -> Dict[str, int]:
+        """Prune nodes that shouldn't be in the system (venv, build artifacts, etc.)"""
+        prune_stats = {"pruned": 0, "kept": 0}
+        
+        # Aggressive patterns for paths that should be pruned
+        prune_patterns = [
+            "/venv/", "/env/", "/.venv/", "/site-packages/", 
+            "/node_modules/", "/__pycache__/", "/.git/", "/.git_back/",
+            "/build/", "/dist/", "/.pytest_cache/",
+            "/coverage/", "/.coverage", "/htmlcov/",
+            # More aggressive patterns
+            "venv/", "site-packages/", "lib/python", "/lib/",
+            "/.tox/", "/eggs/", "/.eggs/", "/sdist/",
+            "/wheel/", "/develop-eggs/", "/.cache/",
+            # Specific to this project's structure
+            "anthropic/", "certifi/", "charset_normalizer/", 
+            "click/", "distro/", "h11/", "httpcore/", "httpx/",
+            "idna/", "jinja2/", "pydantic/", "sniffio/", "typing_extensions/",
+            "urllib3/", "uvicorn/", "fastapi/"
+        ]
+        
+        # Additional file extensions to prune
+        prune_extensions = [".pyc", ".pyo", ".pyd", "__pycache__", ".whl", ".egg"]
+        
+        nodes_to_remove = []
+        
+        # Whitelist: Only keep files from these directories
+        keep_patterns = [
+            "/re_ware/", "/tests/", 
+            "setup.py", "evolve.py", "requirements", 
+            ".yml", ".yaml", ".md", ".txt", ".json", ".toml"
+        ]
+        
+        for node_id, node in list(self.graph.nodes.items()):
+            should_prune = False
+            
+            # Skip non-file nodes (PROJECT, ADVICE, etc.)
+            if not hasattr(node, 'content') or 'path' not in node.content:
+                continue
+                
+            path = node.content['path']
+            
+            # Whitelist check: if it's a file node, only keep if it matches whitelist
+            if hasattr(node, 'type') and str(node.type) == 'NodeType.CODEMODULE':
+                should_keep = False
+                for pattern in keep_patterns:
+                    if pattern in path:
+                        should_keep = True
+                        break
+                if not should_keep:
+                    should_prune = True
+            else:
+                # For non-CODEMODULE nodes, use blacklist approach
+                # Check against prune patterns
+                for pattern in prune_patterns:
+                    if pattern in path:
+                        should_prune = True
+                        break
+                
+                # Check file extensions
+                if not should_prune:
+                    for ext in prune_extensions:
+                        if path.endswith(ext):
+                            should_prune = True
+                            break
+            
+            # Check for nodes with generic auto-generated titles or git hashes
+            if not should_prune and node.title:
+                generic_titles = ["Untitled Node", "Auto-generated", "Unknown"]
+                if any(generic in node.title for generic in generic_titles):
+                    should_prune = True
+                
+                # Check for git object hash-like titles
+                if "File: " in node.title and len(node.title.split("File: ")[-1]) >= 32:
+                    # Looks like "File: <hash>" - probably a git object
+                    should_prune = True
+            
+            if should_prune:
+                nodes_to_remove.append(node_id)
+            else:
+                prune_stats["kept"] += 1
+        
+        # Remove pruned nodes
+        for node_id in nodes_to_remove:
+            if node_id in self.graph.nodes:
+                del self.graph.nodes[node_id]
+            if node_id in self.graph.node_edges:
+                del self.graph.node_edges[node_id]
+            if node_id in self.graph.hot_state.changed_nodes:
+                self.graph.hot_state.changed_nodes.remove(node_id)
+            # Clean up corresponding llm_card
+            if node_id in self.graph.llm_cards:
+                del self.graph.llm_cards[node_id]
+            prune_stats["pruned"] += 1
+        
+        if prune_stats["pruned"] > 0:
+            print(f"   🗂️ Pruned {prune_stats['pruned']} irrelevant nodes")
+        
+        # Clean up orphaned llm_cards
+        self._cleanup_orphaned_llm_cards()
+        
+        return prune_stats
+    
+    def _cleanup_orphaned_llm_cards(self):
+        """Remove llm_cards that don't have corresponding nodes"""
+        orphaned_cards = []
+        for card_id in list(self.graph.llm_cards.keys()):
+            if card_id not in self.graph.nodes:
+                orphaned_cards.append(card_id)
+        
+        for card_id in orphaned_cards:
+            del self.graph.llm_cards[card_id]
+        
+        if orphaned_cards:
+            print(f"   🧹 Cleaned up {len(orphaned_cards)} orphaned llm_cards")
+    
+    def nuclear_cleanup(self) -> Dict[str, int]:
+        """Nuclear option: Remove ALL file nodes and rebuild from scratch"""
+        cleanup_stats = {"removed": 0, "kept": 0}
+        
+        # Keep only essential nodes (PROJECT, ADVICE, etc. - not file-based nodes)
+        essential_types = ["PROJECT", "ADVICE", "REQUIREMENT", "BUG", "BUILD", "COVERAGE"]
+        nodes_to_remove = []
+        
+        for node_id, node in self.graph.nodes.items():
+            if hasattr(node, 'type'):
+                node_type_str = str(node.type).split('.')[-1] if hasattr(node.type, 'name') else str(node.type)
+                
+                if node_type_str in essential_types:
+                    cleanup_stats["kept"] += 1
+                else:
+                    nodes_to_remove.append(node_id)
+            else:
+                nodes_to_remove.append(node_id)
+        
+        # Remove all file nodes
+        for node_id in nodes_to_remove:
+            if node_id in self.graph.nodes:
+                del self.graph.nodes[node_id]
+            if node_id in self.graph.node_edges:
+                del self.graph.node_edges[node_id]
+            if node_id in self.graph.hot_state.changed_nodes:
+                self.graph.hot_state.changed_nodes.remove(node_id)
+            cleanup_stats["removed"] += 1
+        
+        # Clear edges that reference removed nodes
+        edges_to_remove = []
+        for edge_id, edge in self.graph.edges.items():
+            if edge.from_node not in self.graph.nodes or edge.to_node not in self.graph.nodes:
+                edges_to_remove.append(edge_id)
+        
+        for edge_id in edges_to_remove:
+            if edge_id in self.graph.edges:
+                del self.graph.edges[edge_id]
+        
+        # Clear node_edges mapping for removed nodes
+        for node_id in nodes_to_remove:
+            if node_id in self.graph.node_edges:
+                del self.graph.node_edges[node_id]
+        
+        # Fix corrupted node_edges mappings for remaining nodes
+        for node_id, edge_ids in list(self.graph.node_edges.items()):
+            if node_id in self.graph.nodes:  # Only process valid nodes
+                # Filter out invalid edge IDs
+                valid_edge_ids = set()
+                for edge_id in edge_ids:
+                    if edge_id in self.graph.edges:
+                        valid_edge_ids.add(edge_id)
+                    else:
+                        print(f"   🔧 Removing corrupted edge reference: {edge_id}")
+                self.graph.node_edges[node_id] = valid_edge_ids
+            else:
+                # Remove node_edges entries for nodes that don't exist
+                del self.graph.node_edges[node_id]
+        
+        # Clear any orphaned references in hot state
+        if hasattr(self.graph, 'hot_state'):
+            # Remove any changed_nodes that no longer exist
+            valid_changed_nodes = set()
+            for node_id in self.graph.hot_state.changed_nodes:
+                if node_id in self.graph.nodes:
+                    valid_changed_nodes.add(node_id)
+            self.graph.hot_state.changed_nodes = valid_changed_nodes
+        
+        # Final validation - ensure graph integrity
+        self._validate_graph_integrity()
+        
+        print(f"   ☢️  Nuclear cleanup: removed {cleanup_stats['removed']} nodes, kept {cleanup_stats['kept']} essential nodes")
+        return cleanup_stats
+    
+    def _validate_graph_integrity(self):
+        """Validate and fix any graph integrity issues"""
+        try:
+            # Check for orphaned edges
+            orphaned_edges = []
+            for edge_id, edge in self.graph.edges.items():
+                if edge.from_node not in self.graph.nodes or edge.to_node not in self.graph.nodes:
+                    orphaned_edges.append(edge_id)
+            
+            # Remove orphaned edges
+            for edge_id in orphaned_edges:
+                if edge_id in self.graph.edges:
+                    del self.graph.edges[edge_id]
+            
+            if orphaned_edges:
+                print(f"   🔧 Cleaned up {len(orphaned_edges)} orphaned edges")
+            
+            # Fix corrupted node_edges mappings
+            corrupted_refs = 0
+            for node_id, edge_ids in list(self.graph.node_edges.items()):
+                if node_id not in self.graph.nodes:
+                    # Remove mapping for non-existent nodes
+                    del self.graph.node_edges[node_id]
+                    continue
+                    
+                # Filter out invalid edge references
+                valid_edge_ids = set()
+                for edge_id in edge_ids:
+                    if edge_id in self.graph.edges:
+                        valid_edge_ids.add(edge_id)
+                    else:
+                        corrupted_refs += 1
+                        
+                self.graph.node_edges[node_id] = valid_edge_ids
+            
+            if corrupted_refs > 0:
+                print(f"   🔧 Fixed {corrupted_refs} corrupted edge references")
+                
+        except Exception as e:
+            print(f"   ⚠️  Graph integrity check failed: {e}")
     
     def _apply_edge_rule(self, event: DomainEvent, edge_rule: Dict[str, Any], from_node_id: str):
         """Apply edge creation rule to build traceability links"""
@@ -706,6 +968,6 @@ class SensorHub:
         
         self.graph.last_snapshot_data["watermarks"] = self.watermarks.copy()
         
-        # Trigger snapshot save (graph should handle persistence)
-        if hasattr(self.graph, '_should_save_snapshot'):
+        # Only trigger snapshot save if not explicitly disabled
+        if hasattr(self.graph, '_should_save_snapshot') and self.graph._should_save_snapshot is not False:
             self.graph._should_save_snapshot = True

@@ -632,8 +632,12 @@ class OntologyPhenotype:
             return False
         
         # Validate against gene constraints
-        from_node = self.nodes[edge.from_node]
-        to_node = self.nodes[edge.to_node]
+        from_node = self.nodes.get(edge.from_node)
+        to_node = self.nodes.get(edge.to_node)
+        
+        if not from_node or not to_node:
+            print(f"⚠️  Skipping edge validation - missing nodes: from={edge.from_node}, to={edge.to_node}")
+            return False
         validation_errors = self.gene.validate_edge(edge, from_node, to_node)
         if validation_errors:
             print(f"⚠️  Edge validation failed: {validation_errors}")
@@ -657,11 +661,31 @@ class OntologyPhenotype:
         return True
     
     def get_node(self, node_id: str) -> Optional[GraphNode]:
-        """Get node by ID"""
+        """Get node by ID safely"""
+        if not node_id:
+            return None
         return self.nodes.get(node_id)
+    
+    def safe_get_node(self, node_id_or_pattern: str) -> Optional[GraphNode]:
+        """Safely get node, handling edge ID patterns that might be passed by mistake"""
+        if not node_id_or_pattern:
+            return None
+            
+        # If it looks like an edge ID pattern (contains :), skip it
+        if ':' in node_id_or_pattern and node_id_or_pattern.count(':') == 1:
+            prefix, suffix = node_id_or_pattern.split(':', 1)
+            if prefix in ['implements', 'verifies', 'addresses', 'belongs_to', 'depends_on']:
+                print(f"⚠️  Skipping edge ID pattern used as node ID: {node_id_or_pattern}")
+                return None
+                
+        return self.nodes.get(node_id_or_pattern)
     
     def get_neighbors(self, node_id: str, relation: Optional[RelationType] = None) -> List[GraphNode]:
         """Get neighboring nodes, optionally filtered by relation type"""
+        # Validate input
+        if not node_id or node_id not in self.nodes:
+            return []
+            
         # Use NetworkX for faster queries when available
         if self._nx_enabled and node_id in self._nx_graph:
             try:
@@ -669,6 +693,7 @@ class OntologyPhenotype:
                 
                 # Get both predecessors and successors from NetworkX
                 for neighbor_id in list(self._nx_graph.predecessors(node_id)) + list(self._nx_graph.successors(node_id)):
+                    # Ensure neighbor still exists in nodes dict
                     if neighbor_id in self.nodes:
                         # Check relation filter if specified
                         if relation:
@@ -690,6 +715,11 @@ class OntologyPhenotype:
             return neighbors
             
         for edge_id in self.node_edges[node_id]:
+            # Safety check - skip invalid edge IDs
+            if edge_id not in self.edges:
+                print(f"⚠️  Skipping invalid edge ID: {edge_id}")
+                continue
+                
             edge = self.edges[edge_id]
             if relation and edge.relation != relation:
                 continue
@@ -1004,6 +1034,11 @@ class OntologyPhenotype:
     # Hot/Warm Memory Management
     def save_snapshot(self, snapshot_path: Path, phi_data: Dict[str, Any] = None) -> bool:
         """Save warm snapshot for fast restart - this IS the warm layer of Ψ"""
+        import traceback, time, threading
+        node_count = len(self.nodes)
+        caller_info = traceback.extract_stack()[-2] 
+        thread_id = threading.current_thread().ident
+        print(f"🔍 SAVE TRACE: Thread {thread_id} from {caller_info.filename}:{caller_info.lineno} saving {node_count} nodes at {time.time()}")
         try:
             # Compute current Φ projection if not provided
             if not phi_data:
@@ -1020,10 +1055,29 @@ class OntologyPhenotype:
                     "computed_at": time.time()
                 }
             
+            # Debug: Check actual node count before serialization
+            actual_node_count = len(self.nodes)
+            
+            # Add detailed debug of what nodes we're serializing
+            print(f"🔍 DETAILED DEBUG: About to serialize nodes:")
+            for i, (nid, node) in enumerate(list(self.nodes.items())[:10]):  # Show first 10
+                print(f"  {i+1}: {nid} -> {node.type.value}: {node.title[:50]}...")
+            if len(self.nodes) > 10:
+                print(f"  ... and {len(self.nodes) - 10} more nodes")
+            
+            serialized_nodes = {nid: self._serialize_node(node) for nid, node in self.nodes.items()}
+            print(f"🔍 SERIALIZE DEBUG: self.nodes has {actual_node_count}, serialized {len(serialized_nodes)}")
+            
+            # Double check serialized_nodes dictionary size
+            actual_serialized_keys = list(serialized_nodes.keys())
+            print(f"🔍 SERIALIZED KEYS: First 10 keys: {actual_serialized_keys[:10]}")
+            print(f"🔍 SERIALIZED KEYS: Total unique keys: {len(set(actual_serialized_keys))}")
+            print(f"🔍 SERIALIZED KEYS: Any duplicates? {len(actual_serialized_keys) != len(set(actual_serialized_keys))}")
+            
             snapshot_data = {
                 "timestamp": time.time(),
                 # Ψ core: externalized memory substrate
-                "nodes": {nid: self._serialize_node(node) for nid, node in self.nodes.items()},
+                "nodes": serialized_nodes,
                 "edges": {eid: self._serialize_edge(edge) for eid, edge in self.edges.items()},
                 "node_edges": {k: list(v) for k, v in self.node_edges.items()},
                 "llm_cards": {k: self._serialize_card(v) for k, v in self.llm_cards.items()},
@@ -1044,8 +1098,37 @@ class OntologyPhenotype:
                 }
             }
             
-            with open(snapshot_path, 'w') as f:
+            # Atomic write: write to temp file then move
+            import tempfile, os
+            temp_path = f"{snapshot_path}.tmp"
+            
+            print(f"🔍 WRITE DEBUG: About to write {len(snapshot_data['nodes'])} nodes to {temp_path}")
+            with open(temp_path, 'w') as f:
                 json.dump(snapshot_data, f, indent=2)
+            
+            # Verify the temp file before moving
+            with open(temp_path, 'r') as f:
+                verification_data = json.load(f)
+            verified_count = len(verification_data['nodes'])
+            print(f"🔍 VERIFY DEBUG: Temp file contains {verified_count} nodes")
+            
+            if verified_count == len(snapshot_data['nodes']):
+                os.rename(temp_path, snapshot_path)
+                
+                # Final verification after move
+                with open(snapshot_path, 'r') as f:
+                    final_data = json.load(f)
+                final_count = len(final_data['nodes'])
+                print(f"🔍 FINAL DEBUG: Final file contains {final_count} nodes")
+                
+                if final_count != verified_count:
+                    print(f"❌ CORRUPTION DETECTED: File was modified after write! Expected {verified_count}, got {final_count}")
+                    
+                print(f"🔍 WRITE DEBUG: Successfully moved temp file to {snapshot_path}")
+            else:
+                print(f"❌ WRITE ERROR: Verification failed! Expected {len(snapshot_data['nodes'])}, got {verified_count}")
+                os.remove(temp_path)
+                return False
             
             self.warm_snapshot_path = snapshot_path
             print(f"💾 Saved Ψ snapshot: {len(self.nodes)} nodes, {len(self.edges)} edges, Φ₀={phi_data.get('phi0', 'N/A')}")
@@ -1069,7 +1152,8 @@ class OntologyPhenotype:
             return False
             
         # Use existing warm snapshot path or default
-        snapshot_path = self.warm_snapshot_path or Path("psi_snapshot.json")
+        from .core import SNAPSHOT_FILENAME
+        snapshot_path = self.warm_snapshot_path or Path(SNAPSHOT_FILENAME)
         
         try:
             success = self.save_snapshot(snapshot_path)
@@ -1081,6 +1165,9 @@ class OntologyPhenotype:
             return False
     
     def load_snapshot(self, snapshot_path: Path) -> bool:
+        import traceback, time
+        caller_info = traceback.extract_stack()[-2]
+        print(f"🔍 LOAD TRACE: {caller_info.filename}:{caller_info.lineno} loading at {time.time()}")
         """Load warm snapshot, validate identity, and restore Ψ consciousness"""
         try:
             if not snapshot_path.exists():
@@ -1233,9 +1320,14 @@ class OntologyPhenotype:
         
         tested_req_ids = set()
         for test in test_nodes:
-            for neighbor in self.get_neighbors(test.id, RelationType.VERIFIES):
-                if neighbor.type == NodeType.REQUIREMENT:
-                    tested_req_ids.add(neighbor.id)
+            try:
+                for neighbor in self.get_neighbors(test.id, RelationType.VERIFIES):
+                    if neighbor and neighbor.type == NodeType.REQUIREMENT:
+                        tested_req_ids.add(neighbor.id)
+            except Exception as e:
+                # Skip this test node if there are relationship issues
+                print(f"⚠️  Skipping test node {test.id} due to relationship error: {e}")
+                continue
         
         uncovered_requirements = len(req_nodes) - len(tested_req_ids)
         
@@ -1450,7 +1542,7 @@ class OntologyPhenotype:
             self.hot_state.add_pulse({
                 "event": "node_changed",
                 "node_id": node_id,
-                "node_type": self.nodes[node_id].type.value
+                "node_type": self.nodes[node_id].type.value if node_id in self.nodes else "unknown"
             })
     
     def pulse(self, phi_snapshot: Dict[str, Any] = None) -> GraphPulse:

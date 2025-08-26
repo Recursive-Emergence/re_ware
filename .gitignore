@@ -23,7 +23,7 @@ Thumbs.db
 *.log
 
 # RE_ware runtime data (should not be committed)
-psi_snapshot.json
+snapshot.json
 *_snapshot.json
 *.snapshot
 phi_state.json

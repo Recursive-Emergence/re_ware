@@ -107,7 +107,8 @@ class REWareInteractive:
                 return False
             
             # Try to load existing psi snapshot first
-            snapshot_path = self.project_root / "psi_snapshot.json"
+            from .core import SNAPSHOT_FILENAME
+            snapshot_path = self.project_root / SNAPSHOT_FILENAME
             if snapshot_path.exists():
                 success = self.ontology.load_snapshot(snapshot_path)
                 if success:
@@ -244,6 +245,8 @@ class REWareInteractive:
                         await self._cmd_save()
                     elif cmd == 'consolidate':
                         await self._cmd_consolidate()
+                    elif cmd == 'cleanup':
+                        await self._cmd_cleanup()
                     else:
                         print(f"Unknown command: {cmd}. Type 'help' for available commands.")
                         
@@ -271,6 +274,7 @@ class REWareInteractive:
     nodes       - Show ontology nodes and hot state
     save        - Save current Ψ snapshot
     consolidate - Consolidate duplicate file nodes
+    cleanup     - Nuclear cleanup: remove ALL file nodes and rebuild
     help        - Show this help message
     exit        - Exit interactive mode
     
@@ -731,6 +735,40 @@ class REWareInteractive:
         except Exception as e:
             print(f"❌ Consolidation failed: {e}")
     
+    async def _cmd_cleanup(self):
+        """Nuclear cleanup command handler - remove all file nodes"""
+        if not self.sensor_hub or not self.ontology:
+            print("❌ System not properly initialized")
+            return
+            
+        print("☢️  Nuclear cleanup: removing ALL file nodes...")
+        print("⚠️  This will keep only essential nodes (PROJECT, ADVICE, etc.)")
+        
+        try:
+            before_count = len(self.ontology.nodes)
+            stats = self.sensor_hub.nuclear_cleanup()
+            after_count = len(self.ontology.nodes)
+            
+            print(f"""
+🧹 Nuclear Cleanup Complete:
+    Nodes before: {before_count}
+    Nodes after: {after_count}
+    Nodes removed: {stats['removed']}
+    Essential nodes kept: {stats['kept']}
+            """)
+            
+            # Update phi state - major cleanup deserves a boost
+            self.state.update(
+                phi0=0.8,  # Fresh start with high phi
+                coherence=0.9,  # High coherence after cleanup
+                stability=True  # Definitely stable now
+            )
+            
+            print("💡 Run 'tick' to rebuild file nodes from current project state")
+                
+        except Exception as e:
+            print(f"❌ Nuclear cleanup failed: {e}")
+    
     async def _cmd_tick(self):
         """Tick command handler - single evolution cycle"""
         if not self.ontology or not self.sensor_hub:
@@ -744,12 +782,20 @@ class REWareInteractive:
             # 1. Try sensor polling with error handling
             nodes_updated = 0
             try:
+                # Temporarily disable auto-snapshot during sensor sweep
+                old_save_flag = getattr(self.ontology, '_should_save_snapshot', False) 
+                self.ontology._should_save_snapshot = False
+                
                 result = self.sensor_hub.poll_and_apply()
-                nodes_updated = len(result.get("updated_nodes", []))
+                nodes_updated = len(result.get("nodes_changed", []))
                 if nodes_updated > 0:
                     print(f"📡 Sensors updated {nodes_updated} nodes")
                 else:
                     print("📡 No sensor updates")
+                    
+                # Restore save flag after sensor sweep
+                self.ontology._should_save_snapshot = old_save_flag
+                
             except Exception as sensor_error:
                 print(f"📡 Sensor error (continuing): {sensor_error}")
                 # Continue with empty result
@@ -779,7 +825,38 @@ class REWareInteractive:
                 stability_check = False
                 self.state.update(phi0, coherence, stability_check)
             
-            # 6. Check and save snapshot if watermark updates triggered persistence
+            # 6. Consolidate and prune nodes automatically
+            if nodes_updated > 0:  # Only consolidate/prune if there were updates
+                try:
+                    # First consolidate duplicates (same file, multiple node IDs)
+                    print(f"🔧 Consolidating duplicate nodes...")
+                    consolidate_stats = self.sensor_hub.consolidate_duplicate_nodes()
+                    print(f"🔧 Consolidation complete: {consolidate_stats['merged']} files merged, {consolidate_stats['removed']} duplicates removed")
+                    
+                    # Then prune irrelevant nodes (venv, build artifacts)
+                    print(f"🧹 Pruning irrelevant nodes...")
+                    prune_stats = self.sensor_hub.prune_irrelevant_nodes()
+                    print(f"🗂️ Pruning complete: {prune_stats['pruned']} removed, {prune_stats['kept']} kept")
+                    
+                except Exception as cleanup_error:
+                    print(f"⚠️  Node cleanup failed: {cleanup_error}")
+                    import traceback
+                    traceback.print_exc()
+            
+            # 7. Force snapshot save after pruning (if needed)
+            if nodes_updated > 0:
+                self.ontology._should_save_snapshot = True
+                
+            # 8. Save clean test snapshot for comparison
+            if nodes_updated > 0:
+                from .core import SNAPSHOT_FILENAME
+                test_path = self.project_root / f"test_{SNAPSHOT_FILENAME}"
+                actual_node_count = len(self.ontology.nodes)
+                print(f"🔍 ACTUAL NODE COUNT: ontology has {actual_node_count} nodes before test save")
+                print(f"🔍 TEST SAVE: Saving clean snapshot to {test_path}")
+                self.ontology.save_snapshot(test_path)
+            
+            # 9. Check and save snapshot if watermark updates triggered persistence
             self.ontology.check_and_save_pending_snapshot()
             
             cycle_result = {
@@ -793,6 +870,14 @@ class REWareInteractive:
             
             print(f"✅ Tick completed in {cycle_result['cycle_time']:.2f}s")
             print(f"   Φ₀={phi0:.3f}, coherence={coherence:.3f}, stable={stability_check}")
+            
+            # 9. Generate advice after tick with delta changes
+            if nodes_updated > 0 or not stability_check or blocking_gates:
+                print("\n🤖 Generating advice based on changes...")
+                try:
+                    await self._cmd_advice()
+                except Exception as advice_error:
+                    print(f"⚠️  Advice generation failed: {advice_error}")
             
         except Exception as e:
             print(f"❌ Tick failed: {e}")
@@ -832,7 +917,8 @@ class REWareInteractive:
     async def _cmd_save(self):
         """Save command handler - saves snapshot with current state"""
         print("💾 Saving Ψ snapshot...")
-        snapshot_path = self.project_root / "psi_snapshot.json"
+        from .core import SNAPSHOT_FILENAME
+        snapshot_path = self.project_root / SNAPSHOT_FILENAME
         
         # Create phi data with current state
         phi_data = {
@@ -851,8 +937,22 @@ class REWareInteractive:
     
     async def _cmd_exit(self):
         """Exit command handler"""
-        print("💾 Saving final snapshot before exit...")
-        await self._cmd_save()
+        # Skip final save if we already saved recently (to prevent corruption)
+        from .core import SNAPSHOT_FILENAME
+        snapshot_path = self.project_root / SNAPSHOT_FILENAME
+        
+        if snapshot_path.exists():
+            import time
+            file_age = time.time() - snapshot_path.stat().st_mtime
+            if file_age < 10:  # Less than 10 seconds old
+                print("💾 Skipping final save (recent snapshot exists)")
+            else:
+                print("💾 Saving final snapshot before exit...")
+                await self._cmd_save()
+        else:
+            print("💾 Saving final snapshot before exit...")
+            await self._cmd_save()
+            
         self.running = False
         print("👋 Goodbye!")
     

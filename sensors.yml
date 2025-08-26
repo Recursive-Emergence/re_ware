@@ -4,7 +4,7 @@
 rules:
   # Python source code modules
   - match: "**/*.py"
-    exclude: ["**/test_*.py", "**/*_test.py", "**/tests/**", "**/__pycache__/**"]
+    exclude: ["**/test_*.py", "**/*_test.py", "**/tests/**", "**/__pycache__/**", "**/venv/**", "**/env/**", "**/node_modules/**", "**/.venv/**", "**/site-packages/**"]
     node:
       type: CODEMODULE
       fields:

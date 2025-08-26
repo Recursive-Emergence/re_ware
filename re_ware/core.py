@@ -5,6 +5,9 @@ Key feature: agent.evolve() modifies the source code using engineering and entro
 """
 
 from __future__ import annotations
+
+# Configuration constants
+SNAPSHOT_FILENAME = "snapshot.json"
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Callable, Set
 import time

@@ -324,13 +324,48 @@ class FsSensor(SensorInterface):
     
     def _should_ignore(self, file_path: Path) -> bool:
         """Check if file should be ignored"""
+        # Much more aggressive ignore patterns
         ignore_patterns = [
-            ".git", "__pycache__", ".pytest_cache", "node_modules",
-            ".venv", "venv", ".DS_Store", "*.pyc", "*.pyo"
+            ".git", ".git_back", "__pycache__", ".pytest_cache", "node_modules",
+            ".venv", "venv", "env", ".DS_Store", "*.pyc", "*.pyo",
+            # Virtual environments and packages
+            "site-packages", "lib/python", "bin/python", "lib64",
+            "share/", "include/", "Scripts/", "pyvenv.cfg",
+            # Build and cache directories  
+            "build/", "dist/", ".tox/", ".eggs/", "*.egg-info/",
+            ".cache/", ".coverage", "htmlcov/", ".mypy_cache/",
+            # Specific package names that shouldn't be tracked
+            "anthropic/", "certifi/", "charset_normalizer/", "click/",
+            "distro/", "fastapi/", "h11/", "httpcore/", "httpx/",
+            "idna/", "jinja2/", "pydantic/", "sniffio/", "typing_extensions/",
+            "urllib3/", "uvicorn/", "starlette/", "anyio/", "wheel/",
+            "_distutils_hack/", "setuptools/", "pkg_resources/", "pip/"
         ]
         
-        path_str = str(file_path)
-        return any(pattern in path_str for pattern in ignore_patterns)
+        path_str = str(file_path).lower()  # Case insensitive matching
+        
+        # Check if any ignore pattern matches
+        for pattern in ignore_patterns:
+            if pattern in path_str:
+                return True
+                
+        # Only allow files in specific project directories OR specific file types
+        allowed_dirs = ["re_ware/", "tests/"]
+        allowed_extensions = [".py", ".yml", ".yaml", ".md", ".txt", ".json", ".toml"]
+        allowed_files = ["setup.py", "evolve.py", "requirements.txt"]
+        
+        # Check if it's in an allowed directory
+        in_allowed_dir = any(allowed_dir in path_str for allowed_dir in allowed_dirs)
+        
+        # Check if it's an allowed file type or specific file
+        has_allowed_extension = any(path_str.endswith(ext) for ext in allowed_extensions)
+        is_allowed_file = any(allowed_file in path_str for allowed_file in allowed_files)
+        
+        # Only keep files that are either in allowed dirs OR have allowed extensions/names
+        if not (in_allowed_dir or has_allowed_extension or is_allowed_file):
+            return True
+                
+        return False
 
 class GhSensor(SensorInterface):
     """Polls GitHub API for issues, PRs, comments (requires gh CLI)"""

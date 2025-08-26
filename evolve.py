@@ -230,7 +230,8 @@ class REWareWebServer:
                 snapshot_path = self.agent.ontology.warm_snapshot_path
                 if not snapshot_path:
                     from pathlib import Path
-                    snapshot_path = Path("psi_snapshot.json")
+                    from re_ware.core import SNAPSHOT_FILENAME
+                    snapshot_path = Path(SNAPSHOT_FILENAME)
                 
                 # Save the snapshot
                 success = self.agent.ontology.save_snapshot(snapshot_path, phi_data={
@@ -1506,6 +1507,8 @@ class REWareWebServer:
                         await self.handle_cli_auto(command)
                     elif command == 'save':
                         await self.handle_cli_save()
+                    elif command == 'consolidate':
+                        await self.handle_cli_consolidate()
                     elif command == 'ui':
                         await self.handle_cli_ui()
                         # Explicitly continue the loop after ui command
@@ -1539,6 +1542,7 @@ class REWareWebServer:
         print("   tick        - Execute single evolution cycle")
         print("   auto [min]  - Enable autonomous mode (e.g. 'auto 5' for 5min intervals)")
         print("   save        - Save current Ψ state to snapshot")
+        print("   consolidate - Merge duplicate file nodes")
         print("   ui          - Enable web UI dashboard and open browser")
         print("   help        - Show this help")
         print("   quit        - Shutdown system gracefully")
@@ -1659,6 +1663,14 @@ class REWareWebServer:
         except Exception as e:
             print(f"❌ UI enable error: {e}")
 
+    async def handle_cli_consolidate(self):
+        """Handle consolidate command"""
+        try:
+            # Call the agent's consolidate command
+            await self.agent._cmd_consolidate()
+        except Exception as e:
+            print(f"❌ Consolidate error: {e}")
+
 
 async def main():
     """Main CLI entry point"""
@@ -1714,7 +1726,10 @@ async def main():
         return 0
     
     except Exception as e:
+        import traceback
         print(f"❌ Unexpected error: {e}")
+        print("📋 Full traceback:")
+        print(traceback.format_exc())
         return 1
     
     return 0
